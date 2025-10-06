@@ -1,0 +1,44 @@
+root:
+  - type: directory
+    name: ${service}
+    content:
+    - type: file
+      name: BUILD
+      content: |
+        load("@rules_java//java:defs.bzl", "java_library")
+        java_library(
+          name = "application"
+        )
+    - type: directory
+      name: adapter
+      content:
+        - type: directory
+          name: ${adapter}
+          content:
+          - type: directory
+            name: api
+          - type: directory
+            name: core
+          - type: directory
+            name: spring
+    - type: directory
+      name: application
+      content:
+      - type: file
+        name: BUILD
+        content: |
+          SOME MORE service = ${service}
+          SOME MORE SERVICE = ${SERVICE}
+          group = ${group} but also ${Group}
+      - type: directory
+        name: src/main/java/org/example/project/org.example.project/${service}
+        content:
+        - type: file
+          name: ${service}.java
+          content: |
+            package org.example.project.${service}.adapter.in.http.api.resource;
+            @Path("${service}")
+            @Produces (APPLICATION_JSON)
+            @Consumes (APPLICATION_JSON)
+            public interface Http${Service}Resource {
+            }
