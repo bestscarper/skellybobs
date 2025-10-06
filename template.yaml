@@ -14,6 +14,7 @@ root:
       content:
         - type: directory
           name: ${adapter}
+          cond: ${adapter} == "http"
           content:
           - type: directory
             name: api
@@ -21,6 +22,26 @@ root:
             name: core
           - type: directory
             name: spring
+        - type: directory
+          name: ${adapter}
+          cond: ${adapter} == "kafka"
+          content:
+            - type: directory
+              name: core
+              content:
+              - type: directory
+                name: src/main/java/org/example/project/adapter/in/kafka/core
+                content:
+                - type: file
+                  name: data/Event.java
+                  content: |
+                    package org.example.project.adapter.in.kafka.core.data;
+                    public class Event {
+                    }
+            - type: directory
+              name: spring
+            - type: directory
+              name: testlib
     - type: directory
       name: application
       content:
