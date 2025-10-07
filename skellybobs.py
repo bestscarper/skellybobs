@@ -4,7 +4,7 @@ import os
 import sys
 from typing import List
 
-from skellybobs_lib import generate_from_template, parse_params
+from skellybobs_lib import generate_from_template, parse_params, generate_template_from_directory
 
 
 def main(argv: List[str] | None = None) -> int:
@@ -35,8 +35,27 @@ def main(argv: List[str] | None = None) -> int:
             "Example: -p service=happiness -p group=peanuts -p adapter=http -p adapter=kafka"
         ),
     )
+    parser.add_argument(
+        "--scan",
+        help="Scan an existing directory to produce a template YAML (switches CLI into scan mode)",
+    )
+    parser.add_argument(
+        "--template-out",
+        default=os.path.join(os.getcwd(), "scanned-template.yaml"),
+        help="Output path for generated template (used with --scan). Default: ./scanned-template.yaml",
+    )
 
     args = parser.parse_args(argv)
+
+    # If scanning mode is requested, perform scan and exit
+    if args.scan:
+        try:
+            generate_template_from_directory(args.scan, args.template_out)
+        except Exception as e:
+            print(f"Scan failed: {e}", file=sys.stderr)
+            return 1
+        print(f"Template generated at: {args.template_out}")
+        return 0
 
     try:
         params = parse_params(args.param)

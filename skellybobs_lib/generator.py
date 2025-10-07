@@ -299,3 +299,110 @@ def generate_from_template(template_path: str, output_dir: str = "habuild", para
         else:
             # Unknown type: skip
             continue
+
+
+# ---- Scanning existing directories into a template.yaml ----
+
+def _scan_directory_to_blocks(directory: str) -> List[Dict[str, Any]]:
+    """Recursively scan a directory into a list of template blocks.
+
+    Each entry becomes a dict with keys: type (directory|file), name, and optional content.
+    For directories, content is a list of child blocks (omitted if empty).
+    For files, content is the UTF-8 text (omitted if file is empty or undecodable as UTF-8).
+    """
+    try:
+        entries = sorted(os.listdir(directory))
+    except FileNotFoundError:
+        return []
+
+    blocks: List[Dict[str, Any]] = []
+    for entry in entries:
+        if entry in (".", ".."):
+            continue
+        full_path = os.path.join(directory, entry)
+        if os.path.isdir(full_path):
+            # Compact chains of single-child empty directories into a single path segment
+            compact_name = entry
+            compact_path = full_path
+            while True:
+                try:
+                    child_entries = sorted(os.listdir(compact_path))
+                except FileNotFoundError:
+                    break
+                # Exclude current/parent pointers
+                child_entries = [e for e in child_entries if e not in (".", "..")]
+                # Classify children
+                dir_children: List[str] = []
+                file_children: List[str] = []
+                other_children: List[str] = []
+                for ce in child_entries:
+                    ce_path = os.path.join(compact_path, ce)
+                    if os.path.isdir(ce_path):
+                        dir_children.append(ce)
+                    elif os.path.isfile(ce_path):
+                        file_children.append(ce)
+                    else:
+                        other_children.append(ce)
+                # We can compact only when there is exactly one directory child and no files/others
+                if len(dir_children) == 1 and len(file_children) == 0 and len(other_children) == 0:
+                    compact_name = os.path.join(compact_name, dir_children[0])
+                    compact_path = os.path.join(compact_path, dir_children[0])
+                    continue
+                break
+            # Now scan the deepest compacted directory for its children
+            child_blocks = _scan_directory_to_blocks(compact_path)
+            block: Dict[str, Any] = {"type": "directory", "name": compact_name}
+            if child_blocks:
+                block["content"] = child_blocks
+            blocks.append(block)
+        elif os.path.isfile(full_path):
+            block_f: Dict[str, Any] = {"type": "file", "name": entry}
+            try:
+                size = os.path.getsize(full_path)
+            except OSError:
+                size = None
+            data_added = False
+            if size and size > 0:
+                try:
+                    with open(full_path, "r", encoding="utf-8") as f:
+                        text = f.read()
+                    # Only add content if text is non-empty
+                    if text:
+                        block_f["content"] = text
+                        data_added = True
+                except UnicodeDecodeError:
+                    # Binary or non-UTF8: omit content
+                    data_added = False
+                except Exception:
+                    data_added = False
+            # If size is 0 or undecodable, we omit content to denote empty file
+            blocks.append(block_f)
+        else:
+            # Skip other types (symlinks, devices) for simplicity/minimalism
+            continue
+    return blocks
+
+
+def generate_template_from_directory(input_dir: str, output_template_path: str) -> None:
+    """Generate a template YAML by scanning an existing directory structure.
+
+    The resulting YAML will have a top-level 'root' key containing the list of blocks.
+    """
+    if not os.path.isdir(input_dir):
+        raise ValueError(f"Input directory does not exist or is not a directory: {input_dir}")
+    blocks = _scan_directory_to_blocks(input_dir)
+    tmpl = {"root": blocks}
+
+    # Dump YAML ensuring multiline strings (like file contents) use literal block style (|)
+    class _LiteralSafeDumper(yaml.SafeDumper):
+        pass
+
+    def _str_presenter(dumper: yaml.SafeDumper, data: str):  # type: ignore[name-defined]
+        # Use literal block style for any string containing a newline
+        style = '|' if ('\n' in data) else None
+        return dumper.represent_scalar('tag:yaml.org,2002:str', data, style=style)
+
+    _LiteralSafeDumper.add_representer(str, _str_presenter)  # type: ignore[arg-type]
+
+    with open(output_template_path, "w", encoding="utf-8") as f:
+        yaml.dump(tmpl, f, Dumper=_LiteralSafeDumper, sort_keys=False, allow_unicode=True)
