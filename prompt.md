@@ -1,4 +1,4 @@
-
+```
 Write python code with a CLI for developers to use to generate initial code for hexagonal architecture for Java apps.
 Read a template file "template.yaml" which represents the filesystem structure.
 The template file represents part of a filesystem.
@@ -14,8 +14,10 @@ For a directory (type: directory), "content" is an array of elements in the name
 For a file (type: file) the content is a literal block of code which may have placeholders.
 A directory name can have subdirectories (example: "api/src/main/java"), and we should create all intermediate directories.
 If there is no "content" field for a block, then it means an empty file, or an empty directory.
+```
 
 Example of CLI command:
+
 python3 skellybobs.py -p service=happiness -p group=peanuts -p adapter=http -p adapter=kafka
 
 
